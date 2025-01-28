@@ -1,6 +1,0 @@
-framework module VoxWebRTC {
-  umbrella header "VoxWebRTC.h"
-
-  export *
-  module * { export * }
-}
