@@ -1,0 +1,6 @@
+framework module VoxSDK {
+  umbrella header "VoxSDK.h"
+  export *
+
+  module * { export * }
+}
