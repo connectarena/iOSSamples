@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CSApplicationName</key>
+	<string>ChatSample</string>
+	<key>CSApplicationKey</key>
+	<string>pid_06b45d1b_43ac_4d5d_8a9b_8c935391e33e</string>
+	<key>CSContactPermissionPrompt</key>
+	<string>CSContactPermissionAutomatic</string>
+	<key>CSNativeContactsEnabled</key>
+	<true/>
+	<key>CSProductionEnvironment</key>
+	<true/>
+	<key>CSCloudConfiguration</key>
+	<dict>
+		<key>CSCloudAddress</key>
+		<string>proxy.vox-cpaas.in</string>
+		<key>CSCloudPort</key>
+		<string>8050</string>
+		<key>CSPreferredCodecForPSTNCalls</key>
+		<string>PCMA</string>
+	</dict>
+</dict>
+</plist>
