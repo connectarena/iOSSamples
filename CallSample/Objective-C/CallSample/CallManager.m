@@ -345,51 +345,32 @@
 	[self performStartCallActionWithUUID:uuid handle:[call getRemoteNumber]];
 }
 
-
 -(void) handleIncomingCallNotification:(NSNotification*)notification {
-    CSCall* callSession = [notification.userInfo objectForKey:kARCallSession];
     
-    NSLog(@"**AppLog** 📲📲📲 CallSession in IncomingCallNotification is 📲📲📲 %@",callSession);
+    CSCall* callSession = [notification.userInfo objectForKey:kARCallSession];
     
     /*Below Fix is to send Signaling Request for End Call when the call is ended in background State in Call Kit Screen before Login. PreviousCallID is saved to UserDefaults to compare with the current Call ID in performEndCallAction method when there is no valid call is available.*/
     
     NSString *currentCallID = [[callSession getCallID] uppercaseString];
     NSString *callIDSavedInPerformEndCallAction = [[NSUserDefaults standardUserDefaults] objectForKey:keyForCallID];
     
-    NSLog(@"CurrentCallID is %@",currentCallID);
-    NSLog(@"PreviousCallID is %@",callIDSavedInPerformEndCallAction);
     
     if ([currentCallID isEqualToString:callIDSavedInPerformEndCallAction]) {
-        NSLog(@"#########Call Ended Signal sent to SDK#########");
-        [callSession endCall:@"User Terminated"];
+        [callSession endCall:NSLocalizedString(@"user_terminated", nil)];
         return;
     }
     
     NSString* uuidString = [[callSession getCallID] uppercaseString];
-    
-    NSLog(@"\n");
-    NSLog(@"**AppLog** UUID String is %@",uuidString);
-    NSLog(@"\n");
-    
     self.calls[uuidString] = callSession;
-    
-    NSLog(@"\n");
-    NSLog(@"**AppLog** Calls Dictionary after Incoming Call is %@",self.calls);
-    NSLog(@"\n");
-    
     self.needCallScreenDisplay = YES;
     
     CSCallType callType = [callSession getCallType];
     
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
     
-    NSLog(@"\n");
-    NSLog(@"**AppLog**   %@",[self fetchDisplayContactNameFromCallSession:callSession]);
-    NSLog(@"\n");
-    
     CXHandle *callHandle = [[CXHandle alloc]
-                            initWithType:CXHandleTypeGeneric
-                            value:[self fetchDisplayContactNameFromCallSession:callSession]];
+                            initWithType:CXHandleTypePhoneNumber
+                            value:callSession.getRemoteNumber];
     
     CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
     callUpdate.remoteHandle = callHandle;
@@ -401,55 +382,44 @@
     if(callType == CSCallTypeVideoCall){
         callUpdate.hasVideo = YES;
         self.isIncomingCallAVideoCall = true;
-//        self.isInVideoCall = YES;
+        
     }
     else{
         callUpdate.hasVideo = NO;
-//        self.isInVideoCall = NO;
         self.isIncomingCallAVideoCall = false;
     }
-
-    NSLog(@"\n");
-    NSLog(@"**AppLog** ");
-    NSLog(@"\n");
     
-    NSLog(@"\n");
-    NSLog(@"**AppLog** uuidString is %@ and scallid saved in UserDefaults is %@",uuidString,[[NSUserDefaults standardUserDefaults] stringForKey:@"scallid"]);
-    NSLog(@"\n");
     
     NSString *callIDSavedInUserDefaultsForPushCall = [[NSUserDefaults standardUserDefaults] stringForKey:@"scallid"];
     
     /*Check if the call is from a Push Call and the App being in background*/
     if([uuidString isEqualToString:[callIDSavedInUserDefaultsForPushCall uppercaseString]]){
         
-        NSLog(@"**AppLog** ☎️ ☎️ ☎️ Incoming Call Reported in Push Scenario ☎️ ☎️ ☎️");
-
         [self.callKitProvider reportCallWithUUID:uuid updated:callUpdate];
-        [callSession indicateRinging:FALSE];
-        /*Show AudioCallViewController or VideoCallViewController when the call is received from Push Usecase*/
-        if (self.isCallAnsweredFromCallKit) {
-            [self showCallViewFromBackground:true withCallSession:callSession];
+        
+        if (callSession) {
+            if ([callSession isUserOnAnActiveCall]) {
+                [callSession indicateRinging:TRUE];
+            } else {
+                [callSession indicateRinging:FALSE];
+            }
         }
     }else{
-        NSLog(@"**AppLog** 📱 📱 📱 New Incoming Call Reported in Foreground Scenario 📱 📱 📱");
-        
         [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
             if (!error) {
-                
-                    // RCP: Workaround per https://forums.developer.apple.com/message/169511
-                    //[[VoiceClient sharedInstance] configureAudioSession];
+
                 NSLog(@"\n");
-                NSLog(@"**AppLog** Call Session when reporting Incoming Call inside Handle Incoming Call Notification is %@",callSession);
+                NSLog(@"**AppLog** New Incoming Call Successfully Reported");
                 NSLog(@"\n");
-                
+
                 if (callSession) {
                     NSString *callID = [callSession getCallID];
                     if (callID != nil) {
-                        [callSession indicateRinging:FALSE];
-                        
-//                        if (self.isCallAnsweredFromCallKit) {
-//                            [self showCallViewFromBackground:true withCallSession:callSession];
-//                        }
+                        if ([callSession isUserOnAnActiveCall]) {
+                            [callSession indicateRinging:TRUE];
+                        } else {
+                            [callSession indicateRinging:FALSE];
+                        }
                     }else{
                         NSLog(@"No Call ID when reporting Multiple Incoming Calls is %@",callID);
                     }
@@ -460,8 +430,6 @@
             }
         }];
     }
-    
-    [self setCallFrom:NO];
 }
 
 -(void) handleEndCallNotification:(NSNotification*)notification {
@@ -776,7 +744,10 @@
    
     
     CallViewController* audioCallViewController = [[UIStoryboard storyboardWithName:@"Main" bundle:nil] instantiateViewControllerWithIdentifier:@"CallViewController"];
-   
+    CSContact* contact = [callSession getRemoteContact];
+    if(contact != nil) {
+        audioCallViewController.recordID = contact.recordID;
+    }
     audioCallViewController.remoteNumber = [callSession getRemoteNumber];
     audioCallViewController.outgoingCall = FALSE;
     audioCallViewController.callSession = callSession;
