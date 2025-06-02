@@ -11,7 +11,7 @@
 
 @import VoxSDK;
 
-@interface CallViewController : UIViewController
+@interface CallViewController : UIViewController<CSCallDelegate>
 
 @property (strong, nonatomic) NSString* recordID;
 @property (nonatomic) BOOL outgoingCall;

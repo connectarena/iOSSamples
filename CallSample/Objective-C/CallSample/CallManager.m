@@ -100,43 +100,37 @@
 }
 
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
-    
-    NSLog(@"provider:performAnswerCallAction:");
-    
+
     NSString* uuid = [[action callUUID] UUIDString];
-    
-    NSLog(@"\n");
-    NSLog(@"**AppLog** Calls List and the current UUID is %@ and %@",self.calls,uuid);
-    NSLog(@"\n");
-    
-    CSCall* callObject = self.calls[uuid];
-
-    NSLog(@"Call Session in Answer Call Scenario %@",callObject);
-    NSLog(@"Call Type in Answer Call Scenario %ld",(long)[callObject getCallType]);
-
-    [action fulfill];
-    
-    NSLog(@"**AppLog** Count of CallsList is %lu",(unsigned long)self.callsList.count);
-    
     self.isCallAnsweredFromCallKit = YES;
     
-    double delayInSeconds = 1.0;
+    __block int noOfTimes = 0;
+    __block __weak NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1.0
+          target:[NSBlockOperation blockOperationWithBlock:^{
     
-    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-    
-    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-       
-        if (callObject != nil) {
+        if (noOfTimes >=10) {
+            [timer invalidate];
+            [action fulfill];
 
-            [self.callsList addObject:callObject];
-            [callObject answerCall];
-            NSLog(@"**AppLog** Count of CallsList after adding is %lu",(unsigned long)self.callsList.count);
-
-            /* Show the Call View Controller when the call is answered in Foreground scenario. This method gets called only for Foreground scenarios after hitting HandleIncomingCalls Method.*/
-            [self showCallViewFromBackground:true withCallSession:callObject];
         }
-    });
+        CSCall* callObject = self.calls[uuid];
+        if (callObject != nil) {
+            [self.callsList addObject:callObject];
+            [self showVideoOrAudioViewController:callObject];
+            [timer invalidate];
+            [action fulfill];
+        }else{
+            noOfTimes = noOfTimes + 1;
+        }
+        
+        
+    }]
+          selector:@selector(main)
+          userInfo:nil
+          repeats:YES
+    ];
 }
+
 
 - (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
 	NSString* uuid = [[action callUUID] UUIDString];
@@ -705,6 +699,100 @@
         
         
     }
+}
+
+-(void)showVideoOrAudioViewController:(CSCall *)callSession{
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        AppDelegate *appDelegate = (AppDelegate *) [[UIApplication sharedApplication] delegate];
+        
+        
+        UIViewController* topViewController = [self topViewController];
+        if (topViewController == nil) {
+            UIStoryboard *story=[UIStoryboard storyboardWithName:@"Main" bundle:nil];
+            UITabBarController *tabbarController = [story instantiateViewControllerWithIdentifier:@"TabBarController"];
+            UINavigationController *navCont = [[UINavigationController alloc]initWithRootViewController:tabbarController];
+            navCont.navigationBarHidden = TRUE;
+            [appDelegate.window setRootViewController:navCont];
+            [appDelegate.window makeKeyAndVisible];
+            if ([callSession getCallType] == CSCallTypeVoiceCall) {
+                [self navigateToAudioCallScreen:callSession andTopViewController:tabbarController];
+            }else{
+                //[self navigateToVideoCallScreen:callSession andTopViewController:tabbarController];
+            }
+        }else{
+            
+            if ([topViewController isKindOfClass:[CallViewController class]] && [callSession getCallType] == CSCallTypeVoiceCall) {
+                [topViewController dismissViewControllerAnimated:YES completion:^{
+                    double delayInSeconds = 0.3;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                        [self navigateToAudioCallScreen:callSession andTopViewController:[self topViewController]];
+                    });
+                }];
+                
+            } else if ([topViewController isKindOfClass:[CallViewController class]] && [callSession getCallType] == CSCallTypeVideoCall) {
+                
+                [topViewController dismissViewControllerAnimated:YES completion:^{
+                    double delayInSeconds = 0.3;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                       // [self navigateToVideoCallScreen:callSession andTopViewController:[self topViewController]];
+                    });
+                }];
+                
+            } else if ([topViewController isKindOfClass:[VideoCallViewController class]] && [callSession getCallType] == CSCallTypeVoiceCall) {
+                [topViewController dismissViewControllerAnimated:YES completion:^{
+                    double delayInSeconds = 0.3;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                        [self navigateToAudioCallScreen:callSession andTopViewController:[self topViewController]];
+                    });
+                }];
+                
+            } else if ([topViewController isKindOfClass:[VideoCallViewController class]] && [callSession getCallType] == CSCallTypeVideoCall) {
+                [topViewController dismissViewControllerAnimated:YES completion:^{
+                    double delayInSeconds = 0.3;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                       // [self navigateToVideoCallScreen:callSession andTopViewController:[self topViewController]];
+                    });
+                }];
+                
+            } else {
+                if ([callSession getCallType] == CSCallTypeVideoCall) {
+                   // [self navigateToVideoCallScreen:callSession andTopViewController:topViewController];
+                    
+                }else{
+                    [self navigateToAudioCallScreen:callSession andTopViewController:topViewController];
+                }
+            }
+        }
+       // do work here to Usually to update the User Interface
+    });
+}
+
+-(void)navigateToAudioCallScreen:(CSCall *)callSession andTopViewController:(UIViewController *)topViewController{
+   
+    
+    CallViewController* audioCallViewController = [[UIStoryboard storyboardWithName:@"Main" bundle:nil] instantiateViewControllerWithIdentifier:@"CallViewController"];
+   
+    audioCallViewController.remoteNumber = [callSession getRemoteNumber];
+    audioCallViewController.outgoingCall = FALSE;
+    audioCallViewController.callSession = callSession;
+    audioCallViewController.callSession.delegate = audioCallViewController;
+   // audioCallViewController.answerAudioCallForAnIncomingCallForMultiCalls = true;
+    audioCallViewController.view.frame = [[UIScreen mainScreen] bounds];
+    audioCallViewController.modalPresentationStyle = UIModalPresentationFullScreen;
+    [topViewController presentViewController:audioCallViewController animated:TRUE completion:nil];
+    
+    double delayInSeconds = 0.1;
+    
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+    
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        [callSession answerCall];
+    });
 }
 
 -(void) showCallViewFromBackground:(BOOL)isCallAnsweredFromBackground withCallSession:(CSCall *)callObject{
