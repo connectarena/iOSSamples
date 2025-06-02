@@ -12,7 +12,7 @@
 #import <AWSS3/AWSS3TransferUtility.h>
 
 #import "CallManager.h"
-
+#import "LoginViewController.h"
 @import UserNotifications;
 @import VoxSDK;
 
@@ -25,7 +25,7 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
-
+    
 	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 	[center removeAllDeliveredNotifications];
 
@@ -66,6 +66,13 @@
 	pushRegistry.delegate = self;
 	pushRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
 	
+    [self registerForRemoteNotification];
+    
+    if ([CSSettings getAutoSignin] == false){
+        [self moveToLoginScreen];
+    } else {
+        [self moveToHomeViewController];
+    }
 	
     return YES;
 }
@@ -130,21 +137,18 @@
 
 -(void) registerForRemoteNotification {
     
-    if(SYSTEM_VERSION_GRATERTHAN_OR_EQUALTO(@"10.0")){
-        
-        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-        center.delegate = self;
-        [center requestAuthorizationWithOptions:(UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionBadge) completionHandler:^(BOOL granted, NSError * _Nullable error){
-            if(!error){
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    center.delegate = self;
+    [center requestAuthorizationWithOptions:(UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionBadge) completionHandler:^(BOOL granted, NSError * _Nullable error){
+        if(!error){
+            dispatch_async(dispatch_get_main_queue(), ^{
                 [[UIApplication sharedApplication] registerForRemoteNotifications];
-            }
-        }];
-    }
-    else {
-        // Code for old versions
-        [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:(UIUserNotificationTypeSound | UIUserNotificationTypeAlert | UIUserNotificationTypeBadge) categories:nil]];
-        [[UIApplication sharedApplication] registerForRemoteNotifications];
-    }
+            });
+        }
+        else {
+            NSLog(@"UserNotification registration error : %@", error.localizedDescription);
+        }
+    }];
 }
 
 //Called when a notification is delivered to a foreground app.
@@ -195,6 +199,27 @@
 	
 	NSLog(@"Push Notification payload : %@", payload.dictionaryPayload);
 }
+
+-(void)moveToHomeViewController{
+    UIStoryboard *story=[UIStoryboard storyboardWithName:@"Main" bundle:nil];
+    UITabBarController *tabbarController = [story instantiateViewControllerWithIdentifier:@"TabBarController"];
+    
+    [tabbarController setSelectedIndex:0];
+    self.window.rootViewController = tabbarController;
+    [self.window makeKeyAndVisible];
+}
+
+
+- (void)moveToLoginScreen {
+    UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
+    
+    // Instantiate the UINavigationController (Initial View Controller)
+    UINavigationController *navController = [storyboard instantiateInitialViewController];
+    
+    [self.window setRootViewController:navController];
+    [self.window makeKeyAndVisible];
+}
+
 
 #pragma mark - ConnectSDK Notifications
 

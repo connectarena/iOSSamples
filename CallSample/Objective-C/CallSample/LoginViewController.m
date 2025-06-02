@@ -165,6 +165,7 @@
                     if (self.checkmark.isSelected) {
                         [AppSettings setLoginId:self.loginID.text];
                         [AppSettings setpassword:self.password.text];
+                        [CSSettings setAutoSignin:true];
                     }else {
                         [AppSettings setLoginId:nil];
                         [AppSettings setpassword:nil];
