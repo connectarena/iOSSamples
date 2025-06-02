@@ -22,7 +22,9 @@
 @property (nonatomic) BOOL secondCallExists;
 @property (nonatomic) BOOL isCallAnsweredFromCallKit;
 @property (nonatomic) BOOL isIncomingCallAVideoCall;
-
+-(BOOL)isCallFromPush;
+-(void)setCallFrom:(BOOL)value;
+-(void)startRemotePushCall:(NSDictionary *) jsonData;
 @property (strong, nonatomic) NSString* recordID;
 -(void)reportNewIncomingCallToCallKitWithCallData:(NSDictionary *)callData;
 @end

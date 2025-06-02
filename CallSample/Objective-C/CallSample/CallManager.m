@@ -100,6 +100,7 @@
 }
 
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
+    
     NSLog(@"provider:performAnswerCallAction:");
     
     NSString* uuid = [[action callUUID] UUIDString];
@@ -465,6 +466,8 @@
             }
         }];
     }
+    
+    [self setCallFrom:NO];
 }
 
 -(void) handleEndCallNotification:(NSNotification*)notification {
@@ -528,6 +531,56 @@
     }
     
     
+}
+
+-(void)endRemotePushCall:(NSDictionary *) jsonData{
+    NSString* uuidString = [[jsonData valueForKey:@"scallid"] uppercaseString];
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    [self performEndCallActionWithUUID:uuid];
+}
+
+-(void)startRemotePushCall:(NSDictionary *) jsonData{
+    
+    NSString* uuidString = [[jsonData valueForKey:@"scallid"] uppercaseString];
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    
+    NSLog(@"shiva startRemotePushCall uuid %@.", uuid);
+    
+    CXHandle *callHandle = [[CXHandle alloc] initWithType:CXHandleTypePhoneNumber
+                                                    value:[jsonData valueForKey:@"smobnu"]];
+    
+    NSLog(@"shiva startRemotePushCall smobnu %@.", [jsonData valueForKey:@"smobnu"]);
+    CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
+    callUpdate.remoteHandle = callHandle;
+    callUpdate.supportsDTMF = NO;
+    callUpdate.supportsHolding = YES;
+    callUpdate.supportsGrouping = YES;
+    callUpdate.supportsUngrouping = YES;
+    
+    if ([jsonData valueForKey:@"stcalltype"] != nil) {
+               
+         //TODO: Remove the || condition once the changes of stcalltype is changed from the Server
+         //TODO: Get the changes of stcalltype done in the server after verifying the proto.
+         if ([[jsonData valueForKey:@"stcalltype"] intValue] == 1 || [[jsonData valueForKey:@"stcalltype"] intValue] == 4) {
+            callUpdate.hasVideo = NO;
+             self.isIncomingCallAVideoCall = NO;
+           }else{
+               callUpdate.hasVideo = YES;
+               self.isIncomingCallAVideoCall = YES;
+           }
+    }else{
+        callUpdate.hasVideo = NO;
+        self.isIncomingCallAVideoCall = NO;
+    }
+    
+    [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
+        if (!error) {
+            NSLog(@"Incoming Push call successfully reported.");
+        }
+        else {
+            NSLog(@"Failed to report incoming call successfully: %@.", [error localizedDescription]);
+        }
+    }];
 }
 
 -(void) handleMuteNotification:(NSNotification*)notification {
@@ -1016,6 +1069,16 @@
     NSLog(@"**AppLog** Posting ShowAudioCallScreen Notification");
     NSLog(@"\n");
     [[NSNotificationCenter defaultCenter] postNotificationName:@"ShowAudioCallScreen" object:callSession];
+}
+
+
+-(BOOL)isCallFromPush{
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"setCallFrom"];
+}
+
+-(void)setCallFrom:(BOOL)value{
+    [[NSUserDefaults standardUserDefaults] setBool:value  forKey:@"setCallFrom"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 @end

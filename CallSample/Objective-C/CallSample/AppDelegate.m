@@ -235,8 +235,9 @@
     
     
     [[CallManager sharedInstance] reportNewIncomingCallToCallKitWithCallData:callData];
-    
+    [[CallManager sharedInstance] setCallFrom:TRUE];
     [[CSClient sharedInstance] processPushNotification:payload.dictionaryPayload];
+    [[CallManager sharedInstance] startRemotePushCall:callData];
     
     
 }
