@@ -120,12 +120,10 @@
 }
 
 - (void)application:(UIApplication *)application handleEventsForBackgroundURLSession:(NSString *)identifier completionHandler:(void (^)(void))completionHandler {
-	/*
-	 Store the completion handler.
-	 */
-	[AWSS3TransferUtility interceptApplication:application
-		   handleEventsForBackgroundURLSession:identifier
-							 completionHandler:completionHandler];
+
+    [AWSS3TransferUtility interceptApplication:application
+           handleEventsForBackgroundURLSession:identifier
+                             completionHandler:completionHandler];
 }
 
 #pragma mark - Push Notification callback
@@ -160,44 +158,87 @@
 //Called to let your app know which action was selected by the user for a given notification.
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
 	NSLog(@"User Info : %@",response.notification.request.content.userInfo);
+    
+    NSString * notificationBodyTxt = response.notification.request.content.body;
+    
+    if ([notificationBodyTxt isEqualToString:@"Missed Call"]) {
+        
+        NSLog(@"Move to call History");
+        [self openCallHistoryViewController];
+        return;
+    }
+    
     completionHandler();
 }
 
-- (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken
-{
+- (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
+    
+    if(deviceToken.length == 0) {
+        NSLog(@"NO Push token");
+        return;
+    }
+    
+    const unsigned char *tokenBytes = deviceToken.bytes;
+    NSMutableString *deviceTokenString  = [NSMutableString stringWithCapacity:(deviceToken.length * 2)];
+    for (int i = 0; i < deviceToken.length; ++i) {
+        [deviceTokenString appendFormat:@"%02x", tokenBytes[i]];
+    }
+    
+    if (deviceTokenString != nil) {
+        NSLog(@"Device token : %@", deviceTokenString);
+        [CSSettings setRemoteDeviceToken:deviceTokenString];
+    }
 }
 
-- (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error
-{
+- (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
+    NSLog(@"FailToRegisterForRemoteNotifications %@", error.localizedDescription);
 }
 
 #pragma mark - PushKit Delegates
 
 - (void)pushRegistry:(PKPushRegistry *)registry didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type{
-	
-	if([credentials.token length] == 0) {
-		NSLog(@"NO VOIP Push token");
-		return;
-	}
-	
-	const unsigned *tokenBytes = [credentials.token bytes];
-	NSString *deviceTokenString = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
-								   ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
-								   ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
-								   ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
-	
-	if (deviceTokenString != nil) {
-        [CSSettings setRemoteDeviceToken:deviceTokenString];
-//		[CSSettings setDeviceToken:deviceTokenString];
-	}
+    
+    if([credentials.token length] == 0) {
+        NSLog(@"NO VOIP Push token");
+        return;
+    }
+    
+    NSLog(@"Voip Token: %@", credentials.token);
+    
+    const unsigned *tokenBytes = [credentials.token bytes];
+    
+    NSString *deviceTokenString = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
+                                   ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+                                   ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+                                   ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+    
+    if (deviceTokenString != nil) {
+        NSLog(@"VOIP Device token : %@", deviceTokenString);
+        [CSSettings setVoipDeviceToken:deviceTokenString];
+    }
+    
 }
 
-- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:
-(PKPushPayload *)payload forType:(NSString *)type {
-	
-	[[CSClient sharedInstance] processPushNotification:payload.dictionaryPayload];
-	
-	NSLog(@"Push Notification payload : %@", payload.dictionaryPayload);
+
+- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(PKPushType)type withCompletionHandler:(void (^)(void))completion{
+    
+    NSDictionary *aps = payload.dictionaryPayload[@"aps"];
+    NSLog(@"Push Notification payload : %@", payload.dictionaryPayload);
+    NSData *data = [[aps valueForKey:@"alert"] dataUsingEncoding:NSUTF8StringEncoding];
+    NSError *err = nil;
+    NSDictionary *callData = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&err];
+    NSString *callId = [callData valueForKey:@"scallid"];
+    
+    [[NSUserDefaults standardUserDefaults] setObject:callId forKey:@"scallid"];
+    
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
+    
+    [[CallManager sharedInstance] reportNewIncomingCallToCallKitWithCallData:callData];
+    
+    [[CSClient sharedInstance] processPushNotification:payload.dictionaryPayload];
+    
+    
 }
 
 -(void)moveToHomeViewController{
@@ -220,6 +261,16 @@
     [self.window makeKeyAndVisible];
 }
 
+
+-(void)openCallHistoryViewController{
+    
+    UIStoryboard *story=[UIStoryboard storyboardWithName:@"Main" bundle:nil];
+    UITabBarController *tabbarController = [story instantiateViewControllerWithIdentifier:@"TabBarController"];
+    [tabbarController setSelectedIndex:1];
+    self.window.rootViewController = tabbarController;
+    [self.window makeKeyAndVisible];
+    
+}
 
 #pragma mark - ConnectSDK Notifications
 

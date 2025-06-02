@@ -276,6 +276,47 @@
     
 }
 
+-(void)reportNewIncomingCallToCallKitWithCallData:(NSDictionary *)callData{
+    
+    NSString* uuidString = [[callData valueForKey:@"scallid"] uppercaseString];
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    CXHandle *callHandle = [[CXHandle alloc] initWithType:CXHandleTypePhoneNumber
+                                                    value:[callData valueForKey:@"smobnu"]];
+    
+    CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
+    callUpdate.remoteHandle = callHandle;
+    callUpdate.supportsDTMF = NO;
+    callUpdate.supportsHolding = true;
+    callUpdate.supportsGrouping = true;
+    callUpdate.supportsUngrouping = true;
+    
+    
+    if ([callData valueForKey:@"stcalltype"] != nil) {
+        
+        //TODO: Remove the || condition once the changes of stcalltype is changed from the Server
+        //TODO: Get the changes of stcalltype done in the server after verifying the proto.
+        if ([[callData valueForKey:@"stcalltype"] intValue] == 1 || [[callData valueForKey:@"stcalltype"] intValue] == 4) {
+            callUpdate.hasVideo = NO;
+            self.isIncomingCallAVideoCall = false;
+        }else{
+            callUpdate.hasVideo = YES;
+            self.isIncomingCallAVideoCall = true;
+        }
+    }else{
+        callUpdate.hasVideo = NO;
+        self.isIncomingCallAVideoCall = false;
+    }
+    
+    [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
+        if (!error) {
+            NSLog(@"Incoming Push call successfully reported.");
+        }
+        else {
+            NSLog(@"Failed to report incoming call successfully: %@.", [error localizedDescription]);
+        }
+    }];
+}
+
 -(void) dealloc {
 	
 	NSLog(@"CallManager : dealloc");
@@ -631,7 +672,16 @@
     NSLog(@"\n");
     
     UIViewController* topViewController = [self topViewController];
-
+    if (topViewController == nil) {
+        AppDelegate *appDelegate = (AppDelegate *) [[UIApplication sharedApplication] delegate];
+        UIStoryboard *story=[UIStoryboard storyboardWithName:@"Main" bundle:nil];
+        UITabBarController *tabbarController = [story instantiateViewControllerWithIdentifier:@"TabBarController"];
+        
+        [tabbarController setSelectedIndex:0];
+        appDelegate.window.rootViewController = tabbarController;
+        [appDelegate.window makeKeyAndVisible];
+        
+    }
     /*This is a case where there is an Audio Call going on and there is a request from a different user for a Video Call*/
     if ([topViewController isKindOfClass:[CallViewController class]] && self.isIncomingCallAVideoCall){
         NSLog(@"%@", [topViewController presentingViewController]);

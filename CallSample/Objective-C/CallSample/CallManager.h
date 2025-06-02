@@ -24,4 +24,5 @@
 @property (nonatomic) BOOL isIncomingCallAVideoCall;
 
 @property (strong, nonatomic) NSString* recordID;
+-(void)reportNewIncomingCallToCallKitWithCallData:(NSDictionary *)callData;
 @end
