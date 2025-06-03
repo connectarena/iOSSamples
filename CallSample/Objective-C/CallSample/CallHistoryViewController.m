@@ -366,12 +366,10 @@
             else if(data.recordType == CSHistoryTypeCall) {
                 
                 CallViewController* callViewController = (CallViewController*)[self.storyboard instantiateViewControllerWithIdentifier:@"CallViewController"];
-                
+                CSNumber* phoneNumber = [record.contact.numbers objectAtIndex:record.contact.referenceIndex];
                 if(record.contact) {
                     callViewController.recordID = record.contact.recordID;
-                    
-                    CSNumber* phoneNumber = [record.contact.numbers objectAtIndex:record.contact.referenceIndex];
-                    
+                                        
                     callViewController.remoteNumber = phoneNumber.number;
                 }
                 else {
@@ -379,6 +377,11 @@
                 }
                 
                 callViewController.outgoingCall = TRUE;
+                if(phoneNumber.contactStatus == CSContactAppStatusUser) {
+                     callViewController.pstnCall = FALSE;
+                }else{
+                     callViewController.pstnCall = TRUE;
+                }
                 
                 [self  presentViewController:callViewController animated:YES completion:nil];
             }
